@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"OauthADServer/internal/app/ldap"
 	"OauthADServer/internal/app/models"
 	"encoding/json"
 	"fmt"
@@ -13,17 +14,19 @@ import (
 
 type server struct {
 	router *mux.Router
-	config *Config
+	yandexCfg *models.YandexConfig
+	ldapClient ldap.Client
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(config *Config) *server {
+func NewServer(yandexCfg *models.YandexConfig, ldapClient ldap.Client) *server {
 	s := &server{
 		router: mux.NewRouter(),
-		config: config,
+		yandexCfg: yandexCfg,
+		ldapClient: ldapClient,
 	}
 	s.configureRouter()
 	return s
@@ -43,8 +46,8 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 			data := url.Values{}
 			data.Set("grant_type", "authorization_code")
 			data.Set("code", code)
-			data.Set("client_id", s.config.YandexClientId)
-			data.Set("client_secret", s.config.YandexClientSecret)
+			data.Set("client_id", s.yandexCfg.ClientId)
+			data.Set("client_secret", s.yandexCfg.ClientSecret)
 
 			urlStr := "https://oauth.yandex.ru/token"
 
