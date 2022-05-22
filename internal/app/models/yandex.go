@@ -1,8 +1,8 @@
 package models
 
 type YandexConfig struct {
-	ClientId string `json:"yandex_client_id"`
-	ClientSecret string `json:"yandex_client_secret"`
+	ClientId string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 }
 
 func NewYandexConfig(clientId, clientSecret string) *YandexConfig {
@@ -16,7 +16,7 @@ type TokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-type UserInfo struct {
+type YandexUserInfo struct {
 	Id string `json:"id"`
 	Login string `json:"login"`
 	ClientId string `json:"client_id"`

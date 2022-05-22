@@ -1,26 +1,25 @@
 package apiserver
 
 import (
-	"OauthADServer/internal/app/ldap"
 	"OauthADServer/internal/app/models"
 	"fmt"
 	"net/http"
 )
 
 func Start(cfg *models.GlobalConfig) error{
-	ldapClient, err := ldap.NewClient(ldap.Settings{
-		Host:     cfg.LdapHost,
-		Username: cfg.LdapUsername,
-		Password: cfg.LdapPassword,
-		BaseDn:   cfg.LdapDn,
-	})
-	if err != nil {
-		return fmt.Errorf("ldap.NewClient: %v", err)
-	}
+	//ldapClient, err := ldap.NewClient(ldap.Settings{
+	//	Host:     cfg.LdapHost,
+	//	Username: cfg.LdapUsername,
+	//	Password: cfg.LdapPassword,
+	//	BaseDn:   cfg.LdapDn,
+	//})
+	//if err != nil {
+	//	return fmt.Errorf("ldap.NewClient: %v", err)
+	//}
 
 	yandexCfg := models.NewYandexConfig(cfg.YandexClientId, cfg.YandexClientSecret)
-
-	server := NewServer(yandexCfg, ldapClient)
+	googleCfg := models.NewGoogleConfig(cfg.GoogleClientId, cfg.GoogleClientSecret)
+	server := NewServer(yandexCfg, googleCfg, nil)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)
