@@ -16,6 +16,7 @@ type server struct {
 	router *mux.Router
 	yandexCfg *models.YandexConfig
 	googleCfg *models.GoogleConfig
+	vkCfg *models.VkConfig
 	ldapClient ldap.Client
 }
 
@@ -23,11 +24,12 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig, ldapClient ldap.Client) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, ldapClient ldap.Client) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
 		googleCfg: googleCfg,
+		vkCfg: vkCfg,
 		ldapClient: ldapClient,
 	}
 	s.configureRouter()
@@ -40,6 +42,7 @@ func (s *server) configureRouter() {
 	}).Methods("GET")
 	s.router.HandleFunc("/yandex/redirect", s.HandleYandexRedirect()).Methods("GET")
 	s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
+	s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
 }
 
 func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +116,36 @@ func (s *server) HandleGoogleRedirect() func(w http.ResponseWriter, r *http.Requ
 				fmt.Printf("Can not unmarshal JSON: %v", err)
 			}
 			fmt.Println(info)
+		}
+	}
+}
+
+func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code != "" {
+			urlStr := fmt.Sprintf("https://oauth.vk.com/access_token?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s", s.vkCfg.ClientId, s.vkCfg.ClientSecret, "http://localhost:8080/vk/redirect", code)
+
+			client := &http.Client{}
+			req, _ := http.NewRequest("GET", urlStr, nil)
+			res, _ := client.Do(req)
+
+			body, _ := ioutil.ReadAll(res.Body)
+			var accessTokenResponse models.VkTokenResponse
+			if err := json.Unmarshal(body, &accessTokenResponse); err != nil {
+				fmt.Printf("Can not unmarshal JSON: %v", err)
+			}
+
+			urlStr = fmt.Sprintf("https://api.vk.com/method/users.get?v=5.81&uids=%s&access_token=%s&fields=photo_big", accessTokenResponse.UserId, accessTokenResponse.AccessToken)
+			req, _ = http.NewRequest("GET", urlStr, nil)
+			res, _ = client.Do(req)
+
+			body, _ = ioutil.ReadAll(res.Body)
+			var info models.VkUsersGetResponse
+			if err := json.Unmarshal(body, &info); err != nil {
+				fmt.Printf("Can not unmarshal JSON: %v", err)
+			}
+			fmt.Println(info.Response[0])
 		}
 	}
 }

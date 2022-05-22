@@ -5,6 +5,8 @@ type GlobalConfig struct {
 	YandexClientSecret string `json:"yandex_client_secret"`
 	GoogleClientId string `json:"google_client_id"`
 	GoogleClientSecret string `json:"google_client_secret"`
+	VkClientId string `json:"vk_client_id"`
+	VkClientSecret string `json:"vk_client_secret"`
 	LdapHost string `json:"ldap_host"`
 	LdapUsername string `json:"ldap_username"`
 	LdapPassword string `json:"ldap_password"`

@@ -19,7 +19,8 @@ func Start(cfg *models.GlobalConfig) error{
 
 	yandexCfg := models.NewYandexConfig(cfg.YandexClientId, cfg.YandexClientSecret)
 	googleCfg := models.NewGoogleConfig(cfg.GoogleClientId, cfg.GoogleClientSecret)
-	server := NewServer(yandexCfg, googleCfg, nil)
+	vkCfg := models.NewVkConfig(cfg.VkClientId, cfg.VkClientSecret)
+	server := NewServer(yandexCfg, googleCfg, vkCfg, nil)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)
