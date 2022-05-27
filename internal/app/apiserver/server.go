@@ -17,6 +17,7 @@ type server struct {
 	yandexCfg *models.YandexConfig
 	googleCfg *models.GoogleConfig
 	vkCfg *models.VkConfig
+	bitrixCfg *models.BitrixConfig
 	ldapClient ldap.Client
 }
 
@@ -24,12 +25,13 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, ldapClient ldap.Client) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, ldapClient ldap.Client) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
 		googleCfg: googleCfg,
 		vkCfg: vkCfg,
+		bitrixCfg: bitrixCfg,
 		ldapClient: ldapClient,
 	}
 	s.configureRouter()
@@ -43,6 +45,7 @@ func (s *server) configureRouter() {
 	s.router.HandleFunc("/yandex/redirect", s.HandleYandexRedirect()).Methods("GET")
 	s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
 	s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
+	s.router.HandleFunc("/bitrix24/redirect", s.HandleBitrixRedirect()).Methods("GET")
 }
 
 func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +149,26 @@ func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request)
 				fmt.Printf("Can not unmarshal JSON: %v", err)
 			}
 			fmt.Println(info.Response[0])
+		}
+	}
+}
+
+func (s *server) HandleBitrixRedirect() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code != "" {
+			urlStr := fmt.Sprintf("https://b24-ep42ak.bitrix24.ru/oauth/token/?client_id=%s&grant_type=authorization_code&client_secret=%s&redirect_uri=%s&code=%s&scope=task,crm", s.bitrixCfg.ClientId, s.bitrixCfg.ClientSecret, "http://localhost:8080/bitrix24/redirect", code)
+
+			client := &http.Client{}
+			req, _ := http.NewRequest("GET", urlStr, nil)
+			res, _ := client.Do(req)
+
+			body, _ := ioutil.ReadAll(res.Body)
+			var accessTokenResponse models.BitrixTokenResponse
+			if err := json.Unmarshal(body, &accessTokenResponse); err != nil {
+				fmt.Printf("Can not unmarshal JSON: %v", err)
+			}
+			fmt.Println(accessTokenResponse)
 		}
 	}
 }

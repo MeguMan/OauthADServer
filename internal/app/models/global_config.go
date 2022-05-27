@@ -7,6 +7,8 @@ type GlobalConfig struct {
 	GoogleClientSecret string `json:"google_client_secret"`
 	VkClientId string `json:"vk_client_id"`
 	VkClientSecret string `json:"vk_client_secret"`
+	BitrixClientId string `json:"bitrix_client_id"`
+	BitrixClientSecret string `json:"bitrix_client_secret"`
 	LdapHost string `json:"ldap_host"`
 	LdapUsername string `json:"ldap_username"`
 	LdapPassword string `json:"ldap_password"`
