@@ -46,6 +46,47 @@ func (s *server) configureRouter() {
 	s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
 	s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
 	s.router.HandleFunc("/bitrix24/redirect", s.HandleBitrixRedirect()).Methods("GET")
+	s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
+}
+
+func (s *server) HandleGetUserInfoFromAd() func(w http.ResponseWriter, r *http.Request) {
+	type ReqBody struct {
+		Login string `json:"login"`
+		Password string `json:"password"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		vars := mux.Vars(r)
+		username := vars["username"]
+		if username == "" {
+			http.Error(w, "empty username", http.StatusBadRequest)
+			return
+		}
+
+		req := ReqBody{}
+		b, _ := ioutil.ReadAll(r.Body)
+		err := json.Unmarshal(b, &req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		data, err := s.ldapClient.GetUserInfoByUsername(req.Login, req.Password, username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		resp, err := json.Marshal(data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, string(resp))
+	}
 }
 
 func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Request) {
