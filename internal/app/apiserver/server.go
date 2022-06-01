@@ -72,7 +72,7 @@ func (s *server) HandleGetUserInfoFromAd() func(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		data, err := s.ldapClient.GetUserInfoByUsername(req.Login, req.Password, username)
+		data, err := s.ldapClient.GetUserInfoByUsername(username)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -109,7 +109,8 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 			body, _ := ioutil.ReadAll(res.Body)
 			var accessToken models.TokenResponse
 			if err := json.Unmarshal(body, &accessToken); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 
 			urlStr = fmt.Sprintf("https://login.yandex.ru/info?format=json&oauth_token=%s", accessToken.AccessToken)
@@ -119,9 +120,17 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 			body, _ = ioutil.ReadAll(res.Body)
 			var info models.YandexUserInfo
 			if err := json.Unmarshal(body, &info); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
-			fmt.Println(info)
+
+			id, err := s.ldapClient.GetEmployeeNumberByEmail("p.novikov@mami.ru")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			fmt.Println(id)
 		}
 	}
 }
@@ -147,7 +156,8 @@ func (s *server) HandleGoogleRedirect() func(w http.ResponseWriter, r *http.Requ
 			body, _ := ioutil.ReadAll(res.Body)
 			var accessToken models.TokenResponse
 			if err := json.Unmarshal(body, &accessToken); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 
 			urlStr = fmt.Sprintf("https://www.googleapis.com/oauth2/v1/userinfo?alt=json&oauth_token=%s", accessToken.AccessToken)
@@ -157,7 +167,8 @@ func (s *server) HandleGoogleRedirect() func(w http.ResponseWriter, r *http.Requ
 			body, _ = ioutil.ReadAll(res.Body)
 			var info models.GoogleUserInfo
 			if err := json.Unmarshal(body, &info); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			fmt.Println(info)
 		}
@@ -177,7 +188,8 @@ func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request)
 			body, _ := ioutil.ReadAll(res.Body)
 			var accessTokenResponse models.VkTokenResponse
 			if err := json.Unmarshal(body, &accessTokenResponse); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 
 			urlStr = fmt.Sprintf("https://api.vk.com/method/users.get?v=5.81&uids=%s&access_token=%s&fields=photo_big", accessTokenResponse.UserId, accessTokenResponse.AccessToken)
@@ -187,7 +199,8 @@ func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request)
 			body, _ = ioutil.ReadAll(res.Body)
 			var info models.VkUsersGetResponse
 			if err := json.Unmarshal(body, &info); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			fmt.Println(info.Response[0])
 		}
@@ -207,7 +220,8 @@ func (s *server) HandleBitrixRedirect() func(w http.ResponseWriter, r *http.Requ
 			body, _ := ioutil.ReadAll(res.Body)
 			var accessTokenResponse models.BitrixTokenResponse
 			if err := json.Unmarshal(body, &accessTokenResponse); err != nil {
-				fmt.Printf("Can not unmarshal JSON: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			fmt.Println(accessTokenResponse)
 		}

@@ -11,10 +11,18 @@ func Start(cfg *models.GlobalConfig) error{
 	ldapClient, err := ldap.NewClient(ldap.Settings{
 		BaseDn:   cfg.LdapDn,
 		Host:     cfg.LdapHost,
+		Username: cfg.LdapUsername,
+		Password: cfg.LdapPassword,
 	})
 	if err != nil {
 		return fmt.Errorf("ldap.NewClient: %v", err)
 	}
+
+	a, err := ldapClient.GetEmployeeNumberByEmail("p.novikov@mami.ru")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(a)
 
 	yandexCfg := models.NewYandexConfig(cfg.YandexClientId, cfg.YandexClientSecret)
 	googleCfg := models.NewGoogleConfig(cfg.GoogleClientId, cfg.GoogleClientSecret)
@@ -25,4 +33,3 @@ func Start(cfg *models.GlobalConfig) error{
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)
 }
-
