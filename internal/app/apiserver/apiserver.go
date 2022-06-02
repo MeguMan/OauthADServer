@@ -4,6 +4,7 @@ import (
 	"OauthADServer/internal/app/ldap"
 	"OauthADServer/internal/app/models"
 	"OauthADServer/internal/app/storage"
+	"OauthADServer/internal/app/token"
 	"context"
 	"fmt"
 	"net/http"
@@ -33,7 +34,9 @@ func Start(cfg *models.GlobalConfig) error {
 	googleCfg := models.NewGoogleConfig(cfg.GoogleClientId, cfg.GoogleClientSecret)
 	vkCfg := models.NewVkConfig(cfg.VkClientId, cfg.VkClientSecret)
 	bitrixCfg := models.NewBitrixConfig(cfg.BitrixClientId, cfg.BitrixClientSecret)
-	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, ldapClient, storageFacade)
+	tokenManager := token.NewManager(cfg.JwtSecretKey)
+
+	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, ldapClient, storageFacade, tokenManager)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)

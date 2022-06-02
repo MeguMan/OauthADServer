@@ -4,13 +4,17 @@ import (
 	"OauthADServer/internal/app/ldap"
 	"OauthADServer/internal/app/models"
 	"OauthADServer/internal/app/storage"
+	"OauthADServer/internal/app/token"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type server struct {
@@ -21,13 +25,15 @@ type server struct {
 	bitrixCfg *models.BitrixConfig
 	ldapClient ldap.Client
 	storage storage.Facade
+	tokenManager *token.Manager
+	authMiddleware authenticationMiddleware
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, ldapClient ldap.Client, facade storage.Facade) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, ldapClient ldap.Client, facade storage.Facade, tokenManager *token.Manager) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
@@ -36,20 +42,47 @@ func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vk
 		bitrixCfg: bitrixCfg,
 		ldapClient: ldapClient,
 		storage: facade,
+		tokenManager: tokenManager,
+		authMiddleware: authenticationMiddleware{
+			tokenManager: tokenManager,
+			storage:      facade,
+		},
 	}
 	s.configureRouter()
 	return s
 }
 
 func (s *server) configureRouter() {
-	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	//s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	//	http.ServeFile(w, r, "./public/index.html")
+	//}).Methods("GET")
+	//s.router.HandleFunc("/yandex/redirect", s.HandleYandexRedirect()).Methods("GET")
+	//s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
+	//s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
+	//s.router.HandleFunc("/bitrix24/redirect", s.HandleBitrixRedirect()).Methods("GET")
+	//s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
+	//s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
+	s.router.Path("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./public/index.html")
-	}).Methods("GET")
-	s.router.HandleFunc("/yandex/redirect", s.HandleYandexRedirect()).Methods("GET")
-	s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
-	s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
-	s.router.HandleFunc("/bitrix24/redirect", s.HandleBitrixRedirect()).Methods("GET")
-	s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
+	})).Methods("GET")
+	s.router.Path("/yandex/redirect").Handler(http.HandlerFunc(s.HandleYandexRedirect())).Methods("GET")
+	s.router.Path("/vk/redirect").Handler(http.HandlerFunc(s.HandleVkRedirect())).Methods("GET")
+	s.router.Path("/google/redirect").Handler(http.HandlerFunc(s.HandleGoogleRedirect())).Methods("GET")
+	s.router.Path("/bitrix24/redirect").Handler(http.HandlerFunc(s.HandleBitrixRedirect())).Methods("GET")
+
+	//блок функций закрытых мидлварью
+	api := s.router.PathPrefix("/api/v1").Subrouter()
+	api.Use(s.authMiddleware.Middleware)
+	api.Path("/test").Handler(http.HandlerFunc(s.test())).Methods("GET")
+	api.Path("/ad/{username}").Handler(http.HandlerFunc(s.HandleGetUserInfoFromAd())).Methods("POST")
+}
+
+func (s *server) test() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "авторизация успешно пройдена")
+	}
 }
 
 func (s *server) HandleGetUserInfoFromAd() func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +126,7 @@ func (s *server) HandleGetUserInfoFromAd() func(w http.ResponseWriter, r *http.R
 }
 
 func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code != "" {
@@ -121,19 +155,49 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 			res, _ = client.Do(req)
 
 			body, _ = ioutil.ReadAll(res.Body)
-			var info models.YandexUserInfo
-			if err := json.Unmarshal(body, &info); err != nil {
+			var yandexInfo models.YandexUserInfo
+			if err := json.Unmarshal(body, &yandexInfo); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			id, err := s.ldapClient.GetEmployeeNumberByEmail("p.novikov@mami.ru")
+			employeeId, err := s.storage.GetEmployeeId(ctx, yandexInfo.Id, storage.ExternalServiceTypeYandex)
+			if errors.Is(err, storage.ErrNotFound) {
+				//employeeId, err = s.ldapClient.GetEmployeeNumberByEmail("p.novikov@mami.ru") //info.DefaultEmail вместо новикова
+				//if err != nil {
+				//	http.Error(w, err.Error(), http.StatusInternalServerError)
+				//	return
+				//}
+				employeeId = "testingqwerty" //для теста потом убрать
+				err := s.storage.CreateLink(ctx, storage.Link{
+					EmployeeId:            employeeId,
+					ExternalServiceId:     yandexInfo.Id,
+					ExternalServiceTypeId: storage.ExternalServiceTypeYandex,
+				})
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			employeeId = "testingqwerty" //для теста потом убрать
+			jwt, err := s.tokenManager.NewJWT(employeeId, yandexInfo.Id, storage.ExternalServiceTypeYandex, time.Second * 60)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
-			fmt.Println(id)
+			resp, err := json.Marshal(jwt)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, string(resp))
 		}
 	}
 }
