@@ -3,6 +3,7 @@ package apiserver
 import (
 	"OauthADServer/internal/app/ldap"
 	"OauthADServer/internal/app/models"
+	"OauthADServer/internal/app/storage"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -19,13 +20,14 @@ type server struct {
 	vkCfg *models.VkConfig
 	bitrixCfg *models.BitrixConfig
 	ldapClient ldap.Client
+	storage storage.Facade
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, ldapClient ldap.Client) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, ldapClient ldap.Client, facade storage.Facade) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
@@ -33,6 +35,7 @@ func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vk
 		vkCfg: vkCfg,
 		bitrixCfg: bitrixCfg,
 		ldapClient: ldapClient,
+		storage: facade,
 	}
 	s.configureRouter()
 	return s

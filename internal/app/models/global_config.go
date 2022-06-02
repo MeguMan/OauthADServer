@@ -13,6 +13,7 @@ type GlobalConfig struct {
 	LdapUsername string `json:"ldap_username"`
 	LdapPassword string `json:"ldap_password"`
 	LdapDn string `json:"ldap_dn"`
+	DatabaseURL string `json:"database_url"`
 }
 
 func NewGlobalConfig() *GlobalConfig {
