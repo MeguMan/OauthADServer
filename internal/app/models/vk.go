@@ -22,6 +22,7 @@ type VkTokenResponse struct {
 type VkUsersGetResponse struct {
 	Response []*VkUserInfo `json:"response"`
 }
+
 type VkUserInfo struct {
 	Id int64 `json:"id"`
 	PhotoBig string `json:"photo_big"`

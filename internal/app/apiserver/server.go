@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,15 +54,6 @@ func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vk
 }
 
 func (s *server) configureRouter() {
-	//s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	//	http.ServeFile(w, r, "./public/index.html")
-	//}).Methods("GET")
-	//s.router.HandleFunc("/yandex/redirect", s.HandleYandexRedirect()).Methods("GET")
-	//s.router.HandleFunc("/google/redirect", s.HandleGoogleRedirect()).Methods("GET")
-	//s.router.HandleFunc("/vk/redirect", s.HandleVkRedirect()).Methods("GET")
-	//s.router.HandleFunc("/bitrix24/redirect", s.HandleBitrixRedirect()).Methods("GET")
-	//s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
-	//s.router.HandleFunc("/ad/{username}", s.HandleGetUserInfoFromAd()).Methods("POST")
 	s.router.Path("/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./public/index.html")
 	})).Methods("GET")
@@ -73,7 +65,7 @@ func (s *server) configureRouter() {
 	//блок функций закрытых мидлварью
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	api.Use(s.authMiddleware.Middleware)
-	api.Path("/test").Handler(http.HandlerFunc(s.test())).Methods("GET")
+	api.Path("/testAuth").Handler(http.HandlerFunc(s.test())).Methods("GET")
 	api.Path("/ad/{username}").Handler(http.HandlerFunc(s.HandleGetUserInfoFromAd())).Methods("POST")
 }
 
@@ -81,7 +73,6 @@ func (s *server) test() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "авторизация успешно пройдена")
 	}
 }
 
@@ -161,36 +152,7 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 				return
 			}
 
-			employeeId, err := s.storage.GetEmployeeId(ctx, yandexInfo.Id, storage.ExternalServiceTypeYandex)
-			if errors.Is(err, storage.ErrNotFound) {
-				//employeeId, err = s.ldapClient.GetEmployeeNumberByEmail("p.novikov@mami.ru") //info.DefaultEmail вместо новикова
-				//if err != nil {
-				//	http.Error(w, err.Error(), http.StatusInternalServerError)
-				//	return
-				//}
-				employeeId = "testingqwerty" //для теста потом убрать
-				err := s.storage.CreateLink(ctx, storage.Link{
-					EmployeeId:            employeeId,
-					ExternalServiceId:     yandexInfo.Id,
-					ExternalServiceTypeId: storage.ExternalServiceTypeYandex,
-				})
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-			} else if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			employeeId = "testingqwerty" //для теста потом убрать
-			jwt, err := s.tokenManager.NewJWT(employeeId, yandexInfo.Id, storage.ExternalServiceTypeYandex, time.Second * 60)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			resp, err := json.Marshal(jwt)
+			resp, err := s.buildJwt(ctx, yandexInfo.Id, yandexInfo.DefaultEmail, storage.ExternalServiceTypeYandex)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -203,6 +165,7 @@ func (s *server) HandleYandexRedirect() func(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *server) HandleGoogleRedirect() func(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code != "" {
@@ -237,12 +200,21 @@ func (s *server) HandleGoogleRedirect() func(w http.ResponseWriter, r *http.Requ
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			fmt.Println(info)
+
+			resp, err := s.buildJwt(ctx, info.Id, info.Email, storage.ExternalServiceTypeGoogle)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, string(resp))
 		}
 	}
 }
 
 func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code != "" {
@@ -269,7 +241,15 @@ func (s *server) HandleVkRedirect() func(w http.ResponseWriter, r *http.Request)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			fmt.Println(info.Response[0])
+
+			resp, err := s.buildJwt(ctx, strconv.FormatInt(info.Response[0].Id, 10), accessTokenResponse.Email, storage.ExternalServiceTypeVkontakte)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, string(resp))
 		}
 	}
 }
@@ -293,4 +273,38 @@ func (s *server) HandleBitrixRedirect() func(w http.ResponseWriter, r *http.Requ
 			fmt.Println(accessTokenResponse)
 		}
 	}
+}
+
+func (s *server) buildJwt(ctx context.Context, externalId, email string, serviceType storage.ExternalServiceType) ([]byte, error) {
+	employeeId, err := s.storage.GetEmployeeId(ctx, externalId, serviceType)
+	if errors.Is(err, storage.ErrNotFound) {
+		employeeId, err = s.ldapClient.GetEmployeeNumberByEmail(email)
+		if err != nil {
+			return nil, err
+		}
+		employeeId = "testingqwerty" //для теста потом убрать
+		//err := s.storage.CreateLink(ctx, storage.Link{
+		//	EmployeeId:            employeeId,
+		//	ExternalServiceId:     externalId,
+		//	ExternalServiceTypeId: serviceType,
+		//})
+		//if err != nil {
+		//	return nil, err
+		//}
+	} else if err != nil {
+		return nil, err
+	}
+
+	employeeId = "testingqwerty" //для теста потом убрать
+	jwt, err := s.tokenManager.NewJWT(employeeId, externalId, serviceType, time.Second * 60)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := json.Marshal(jwt)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
