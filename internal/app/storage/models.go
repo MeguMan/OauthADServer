@@ -14,3 +14,9 @@ type Link struct {
 	ExternalServiceId string `db:"external_service_id"`
 	ExternalServiceTypeId ExternalServiceType `db:"external_service_type_id"`
 }
+
+//type OauthClient struct {
+//	ClientId string `db:"client_id"`
+//	ClientSecret string `db:"client_secret"`
+//	RedirectUri string `db:"redirect_uri"`
+//}

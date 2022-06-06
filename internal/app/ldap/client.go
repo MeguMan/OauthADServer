@@ -42,6 +42,12 @@ func NewClient(settings Settings) (*ldapClient, error) {
 		password: settings.Password,
 	}
 
+	err := client.newConn()
+	if err != nil {
+		return nil, fmt.Errorf("connect to ldap client: %w", err)
+	}
+	client.conn.Close()
+
 	return client, nil
 }
 

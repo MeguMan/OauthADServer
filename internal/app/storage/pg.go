@@ -57,3 +57,41 @@ func (db *PgStorage) GetEmployeeId(ctx context.Context, externalServiceId string
 
 	return employeeId, nil
 }
+
+//func (db *PgStorage) CreateClient(ctx context.Context, client OauthClient) error {
+//	_, err := db.conn.Exec(ctx, "insert into oauth_client (client_id, client_secret, redirect_uri) values ($1, $2, $3)",
+//		client.ClientId, client.ClientSecret, client.RedirectUri)
+//	return err
+//}
+//
+//func (db *PgStorage) GetRedirectUriByClientId(ctx context.Context, clientId string) (string, error) {
+//	var redirectUri string
+//
+//	row := db.conn.QueryRow(ctx, "select redirect_uri from oauth_client where client_id = $1", clientId)
+//
+//	err := row.Scan(&redirectUri)
+//	if err != nil {
+//		if err == pgx.ErrNoRows {
+//			return "", ErrNotFound
+//		}
+//		return "", err
+//	}
+//
+//	return redirectUri, nil
+//}
+//
+//func (db *PgStorage) GetRedirectUriByClientIdAndSecret(ctx context.Context, client OauthClient) (string, error) {
+//	var redirectUri string
+//
+//	row := db.conn.QueryRow(ctx, "select redirect_uri from oauth_client where client_id = $1 and client_secret = $2", client.ClientId, client.ClientSecret)
+//
+//	err := row.Scan(&redirectUri)
+//	if err != nil {
+//		if err == pgx.ErrNoRows {
+//			return "", ErrNotFound
+//		}
+//		return "", err
+//	}
+//
+//	return redirectUri, nil
+//}
