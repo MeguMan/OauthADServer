@@ -5,6 +5,7 @@ const (
 	ExternalServiceTypeYandex ExternalServiceType = 1
 	ExternalServiceTypeVkontakte ExternalServiceType = 2
 	ExternalServiceTypeGoogle ExternalServiceType = 3
+	ExternalServiceTypeGithub ExternalServiceType = 4
 )
 
 type ExternalServiceType int8
