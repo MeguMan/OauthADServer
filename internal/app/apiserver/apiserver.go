@@ -51,7 +51,9 @@ func Start(cfg *models.GlobalConfig) error {
 	vkCfg := models.NewVkConfig(cfg.VkClientId, cfg.VkClientSecret)
 	bitrixCfg := models.NewBitrixConfig(cfg.BitrixClientId, cfg.BitrixClientSecret)
 	githubCfg := models.NewGithubConfig(cfg.GithubClientId, cfg.GithubClientSecret)
-	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
+	mailCfg := models.NewMailConfig(cfg.MailClientId, cfg.MailClientSecret)
+
+	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)
