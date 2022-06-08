@@ -34,7 +34,7 @@ func Start(cfg *models.GlobalConfig) error {
 	if err != nil {
 		return fmt.Errorf("ldap.NewClient stud: %v", err)
 	}
-	ldapStudClient.GetUserInfoByUsername("d.s.pashincev")
+
 	pgStorage, err := storage.NewPgStorage(cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("create pg storage: %v", err)
@@ -53,8 +53,9 @@ func Start(cfg *models.GlobalConfig) error {
 	githubCfg := models.NewGithubConfig(cfg.GithubClientId, cfg.GithubClientSecret)
 	mailCfg := models.NewMailConfig(cfg.MailClientId, cfg.MailClientSecret)
 	odnklsCfg := models.NewOdnoklassnikiConfig(cfg.OdnoklassnikiClientId, cfg.OdnoklassnikiClientSecret)
+	discCfg := models.NewDiscordConfig(cfg.DiscordClientId, cfg.DiscordClientSecret)
 
-	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, odnklsCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
+	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, odnklsCfg, discCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)

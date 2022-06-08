@@ -15,6 +15,8 @@ type GlobalConfig struct {
 	MailClientSecret string `json:"mail_client_secret"`
 	OdnoklassnikiClientId string `json:"odnoklassniki_client_id"`
 	OdnoklassnikiClientSecret string `json:"odnoklassniki_client_secret"`
+	DiscordClientId string `json:"discord_client_id"`
+	DiscordClientSecret string `json:"discord_client_secret"`
 	LdapStaffHost string `json:"ldap_staff_host"`
 	LdapStudHost string `json:"ldap_stud_host"`
 	LdapUsername string `json:"ldap_username"`

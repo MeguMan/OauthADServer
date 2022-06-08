@@ -7,6 +7,7 @@ const (
 	ExternalServiceTypeGoogle ExternalServiceType = 3
 	ExternalServiceTypeGithub ExternalServiceType = 4
 	ExternalServiceTypeMail ExternalServiceType = 5
+	ExternalServiceTypeDiscord ExternalServiceType = 6
 )
 
 type ExternalServiceType int8

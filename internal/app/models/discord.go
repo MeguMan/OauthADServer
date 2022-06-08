@@ -1,22 +1,22 @@
 package models
 
-type OdnoklassnikiConfig struct {
+type DiscordConfig struct {
 	ClientId string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 }
 
-type OdnoklassnikiToken struct {
+type DiscordToken struct {
 	AccessToken string `json:"access_token"`
 	TokenType string `json:"token_type"`
 }
 
-func NewOdnoklassnikiConfig(clientId, clientSecret string) *OdnoklassnikiConfig {
-	return &OdnoklassnikiConfig{
+func NewDiscordConfig(clientId, clientSecret string) *DiscordConfig {
+	return &DiscordConfig{
 		ClientId: clientId,
 		ClientSecret: clientSecret,
 	}
 }
-type OdnoklassnikiUserInfo struct {
+type DiscordUserInfo struct {
 	Id string `json:"id"`
 	Email string `json:"email"`
 }
