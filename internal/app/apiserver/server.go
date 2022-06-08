@@ -30,6 +30,7 @@ type server struct {
 	bitrixCfg *models.BitrixConfig
 	githubCfg *models.GithubConfig
 	mailCfg *models.MailConfig
+	odnklsCfg *models.OdnoklassnikiConfig
 
 	ldapStaffClient ldap.Client
 	ldapStudClient ldap.Client
@@ -42,7 +43,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, githubCfg *models.GithubConfig, mailCfg *models.MailConfig, ldapStaffClient, ldapStudClient ldap.Client, facade storage.Facade, tokenManager *token.Manager, cache *cache.Cache) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, githubCfg *models.GithubConfig, mailCfg *models.MailConfig, odnklsCfg *models.OdnoklassnikiConfig, ldapStaffClient, ldapStudClient ldap.Client, facade storage.Facade, tokenManager *token.Manager, cache *cache.Cache) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
@@ -51,6 +52,7 @@ func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vk
 		bitrixCfg: bitrixCfg,
 		githubCfg: githubCfg,
 		mailCfg: mailCfg,
+		odnklsCfg: odnklsCfg,
 		ldapStaffClient: ldapStaffClient,
 		ldapStudClient: ldapStudClient,
 		storage: facade,
@@ -83,6 +85,11 @@ func (s *server) configureRouter() {
 
 	s.router.Path("/mail/auth").Handler(http.HandlerFunc(s.HandleMailAuth())).Methods("GET")
 	s.router.Path("/mail/redirect").Handler(http.HandlerFunc(s.HandleMailRedirect())).Methods("GET")
+
+	//не возвращает почту
+	s.router.Path("/odnoklassniki/auth").Handler(http.HandlerFunc(s.HandleOdnoklassnikiAuth())).Methods("GET")
+	s.router.Path("/odnoklassniki/redirect").Handler(http.HandlerFunc(s.HandleOdnoklassnikiRedirect())).Methods("GET")
+
 	//s.router.Path("/bitrix24/redirect").Handler(http.HandlerFunc(s.HandleBitrixRedirect())).Methods("GET")
 
 	//блок функций закрытых мидлварью
@@ -491,6 +498,69 @@ func (s *server) HandleMailRedirect() func(w http.ResponseWriter, r *http.Reques
 			}
 
 			http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", val.RedirectUri, jwt.AccessToken), http.StatusPermanentRedirect)
+		}
+	}
+}
+
+
+func (s *server) HandleOdnoklassnikiAuth() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		redirectUri := r.URL.Query().Get("redirect_uri")
+		if redirectUri == "" {
+			http.Error(w, "empty redirect_uri", http.StatusBadRequest)
+			return
+		}
+
+		oauthCode := helpers.RandStringBytes(5)
+		s.cache.Set(oauthCode, &cache.Value{
+			RedirectUri: redirectUri,
+		}, time.Second * 600)
+
+		http.Redirect(w, r, fmt.Sprintf("https://connect.ok.ru/oauth/authorize?client_id=%s&scope=GET_EMAIL&response_type=code&redirect_uri=http://localhost:8080/odnoklassniki/redirect&layout=w&state=%s", s.odnklsCfg.ClientId, oauthCode), http.StatusPermanentRedirect)
+	}
+}
+
+func (s *server) HandleOdnoklassnikiRedirect() func(w http.ResponseWriter, r *http.Request) {
+	//ctx := context.Background()
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+		if code != "" && state != ""{
+			urlStr := fmt.Sprintf("https://api.ok.ru/oauth/token.do?code=%s&client_id=%s&client_secret=%s&redirect_uri=%s&grant_type=authorization_code", code, s.odnklsCfg.ClientId, s.odnklsCfg.ClientSecret, "http://localhost:8080/odnoklassniki/redirect")
+			client := &http.Client{}
+			req, _ := http.NewRequest("POST", urlStr, nil)
+			res, _ := client.Do(req)
+
+			body, _ := ioutil.ReadAll(res.Body)
+			var accessToken models.OdnoklassnikiToken
+			if err := json.Unmarshal(body, &accessToken); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			urlStr = fmt.Sprintf("http://api.odnoklassniki.ru/fb.do?method=%s&access_token=%s", accessToken.AccessToken)
+			req, _ = http.NewRequest("GET", urlStr, nil)
+			res, _ = client.Do(req)
+			body, _ = ioutil.ReadAll(res.Body)
+			var info models.MailUserInfo
+			if err := json.Unmarshal(body, &info); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			//
+			//val, exists := s.cache.Get(state)
+			//if !exists {
+			//	http.Error(w, "state not found in cache", http.StatusInternalServerError)
+			//	return
+			//}
+			//
+			//jwt, err := s.buildJwt(ctx, info.Id, info.Email, storage.ExternalServiceTypeMail)
+			//if err != nil {
+			//	http.Error(w, "buildJwt", http.StatusInternalServerError)
+			//	return
+			//}
+			//
+			//http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", val.RedirectUri, jwt.AccessToken), http.StatusPermanentRedirect)
 		}
 	}
 }

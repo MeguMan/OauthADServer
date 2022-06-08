@@ -13,6 +13,8 @@ type GlobalConfig struct {
 	GithubClientSecret string `json:"github_client_secret"`
 	MailClientId string `json:"mail_client_id"`
 	MailClientSecret string `json:"mail_client_secret"`
+	OdnoklassnikiClientId string `json:"odnoklassniki_client_id"`
+	OdnoklassnikiClientSecret string `json:"odnoklassniki_client_secret"`
 	LdapStaffHost string `json:"ldap_staff_host"`
 	LdapStudHost string `json:"ldap_stud_host"`
 	LdapUsername string `json:"ldap_username"`
