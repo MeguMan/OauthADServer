@@ -32,6 +32,7 @@ type server struct {
 	mailCfg *models.MailConfig
 	odnklsCfg *models.OdnoklassnikiConfig
 	discCfg *models.DiscordConfig
+	fcbCfg *models.FacebookConfig
 
 	ldapStaffClient ldap.Client
 	ldapStudClient ldap.Client
@@ -44,7 +45,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, githubCfg *models.GithubConfig, mailCfg *models.MailConfig, odnklsCfg *models.OdnoklassnikiConfig, discCfg *models.DiscordConfig, ldapStaffClient, ldapStudClient ldap.Client, facade storage.Facade, tokenManager *token.Manager, cache *cache.Cache) *server {
+func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vkCfg *models.VkConfig, bitrixCfg *models.BitrixConfig, githubCfg *models.GithubConfig, mailCfg *models.MailConfig, odnklsCfg *models.OdnoklassnikiConfig, discCfg *models.DiscordConfig, fcbCfg *models.FacebookConfig, ldapStaffClient, ldapStudClient ldap.Client, facade storage.Facade, tokenManager *token.Manager, cache *cache.Cache) *server {
 	s := &server{
 		router: mux.NewRouter(),
 		yandexCfg: yandexCfg,
@@ -55,6 +56,7 @@ func NewServer(yandexCfg *models.YandexConfig, googleCfg *models.GoogleConfig,vk
 		mailCfg: mailCfg,
 		odnklsCfg: odnklsCfg,
 		discCfg: discCfg,
+		fcbCfg: fcbCfg,
 		ldapStaffClient: ldapStaffClient,
 		ldapStudClient: ldapStudClient,
 		storage: facade,
@@ -94,6 +96,9 @@ func (s *server) configureRouter() {
 
 	s.router.Path("/discord/auth").Handler(http.HandlerFunc(s.HandleDiscordAuth())).Methods("GET")
 	s.router.Path("/discord/redirect").Handler(http.HandlerFunc(s.HandleDiscordRedirect())).Methods("GET")
+
+	s.router.Path("/facebook/auth").Handler(http.HandlerFunc(s.HandleFacebookAuth())).Methods("GET")
+	s.router.Path("/facebook/redirect").Handler(http.HandlerFunc(s.HandleFacebookRedirect())).Methods("GET")
 
 	//s.router.Path("/bitrix24/redirect").Handler(http.HandlerFunc(s.HandleBitrixRedirect())).Methods("GET")
 
@@ -619,6 +624,71 @@ func (s *server) HandleDiscordRedirect() func(w http.ResponseWriter, r *http.Req
 			}
 
 			jwt, err := s.buildJwt(ctx, info.Id, info.Email, storage.ExternalServiceTypeDiscord)
+			if err != nil {
+				http.Error(w, "buildJwt", http.StatusInternalServerError)
+				return
+			}
+
+			http.Redirect(w, r, fmt.Sprintf("%s?access_token=%s", val.RedirectUri, jwt.AccessToken), http.StatusPermanentRedirect)
+		}
+	}
+}
+
+func (s *server) HandleFacebookAuth() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		redirectUri := r.URL.Query().Get("redirect_uri")
+		if redirectUri == "" {
+			http.Error(w, "empty redirect_uri", http.StatusBadRequest)
+			return
+		}
+
+		oauthCode := helpers.RandStringBytes(5)
+		s.cache.Set(oauthCode, &cache.Value{
+			RedirectUri: redirectUri,
+		}, time.Second * 600)
+
+		http.Redirect(w, r, fmt.Sprintf("https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=http://localhost:8080/facebook/redirect&scope=email&response_type=code&state=%s", s.discCfg.ClientId, oauthCode), http.StatusPermanentRedirect)
+	}
+}
+
+func (s *server) HandleFacebookRedirect() func(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+		if code != "" && state != ""{
+			urlStr := fmt.Sprintf("https://graph.facebook.com/oauth/access_token?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s", s.fcbCfg.ClientId, s.fcbCfg.ClientSecret, "http://localhost:8080/facebook/redirect", code)
+
+			client := &http.Client{}
+			req, _ := http.NewRequest("GET", urlStr, nil)
+			//req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			res, _ := client.Do(req)
+
+			body, _ := ioutil.ReadAll(res.Body)
+			var accessToken models.FacebookToken
+			if err := json.Unmarshal(body, &accessToken); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			req, _ = http.NewRequest("GET", fmt.Sprintf("https://graph.facebook.com/me?access_token=%s&fields=id,email", accessToken.AccessToken), nil)
+			//req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken.AccessToken))
+			res, _ = client.Do(req)
+
+			body, _ = ioutil.ReadAll(res.Body)
+			var info models.FacebookUserInfo
+			if err := json.Unmarshal(body, &accessToken); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			val, exists := s.cache.Get(state)
+			if !exists {
+				http.Error(w, "state not found in cache", http.StatusInternalServerError)
+				return
+			}
+
+			jwt, err := s.buildJwt(ctx, info.Id, info.Email, storage.ExternalServiceTypeFacebook)
 			if err != nil {
 				http.Error(w, "buildJwt", http.StatusInternalServerError)
 				return

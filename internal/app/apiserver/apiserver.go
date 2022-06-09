@@ -54,8 +54,9 @@ func Start(cfg *models.GlobalConfig) error {
 	mailCfg := models.NewMailConfig(cfg.MailClientId, cfg.MailClientSecret)
 	odnklsCfg := models.NewOdnoklassnikiConfig(cfg.OdnoklassnikiClientId, cfg.OdnoklassnikiClientSecret)
 	discCfg := models.NewDiscordConfig(cfg.DiscordClientId, cfg.DiscordClientSecret)
+	fcbCfg := models.NewFacebookConfig(cfg.FacebookClientId, cfg.FacebookClientSecret)
 
-	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, odnklsCfg, discCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
+	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, odnklsCfg, discCfg, fcbCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)
