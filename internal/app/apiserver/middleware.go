@@ -21,7 +21,7 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 			http.Error(w, "empty auth header", http.StatusUnauthorized)
 			return
 		}
-		fmt.Println(authHeader)
+
 		headerParts := strings.Split(authHeader, " ")
 		if len(headerParts) != 2 {
 			http.Error(w, "invalid auth header", http.StatusUnauthorized)

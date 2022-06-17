@@ -1,0 +1,34 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: diplom-go-deployment
+  labels:
+    app: diplom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: diplom
+  template:
+    metadata:
+      labels:
+        app: diplom
+    spec:
+      containers:
+        - name: diplom
+          image: plifin/diplom:1.3.18
+          imagePullPolicy: IfNotPresent
+          command: ["apiserver"]
+          ports:
+            - containerPort: 8080
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: diplom-go-service
+spec:
+  selector:
+    app: diplom
+  type: NodePort
+  ports:
+    - port: 8080

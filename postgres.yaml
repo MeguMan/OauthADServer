@@ -1,0 +1,81 @@
+kind: PersistentVolume                        # Create a PV
+apiVersion: v1
+metadata:
+  name: diplom-postgres-volume
+  labels:
+    type: local
+    app: diplom-postgres
+spec:
+  storageClassName: manual                    # Storage class. A PV Claim requesting the same storageClass can be bound to this volume.
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:                                   # hostPath PersistentVolume is used for development and testing. It uses a file/directory on the Node to emulate network-attached storage
+    path: "/mnt/data"
+  persistentVolumeReclaimPolicy: Retain       # Retain the PV even after PVC is deleted.
+---
+kind: PersistentVolumeClaim                   # Create a PersistentVolumeClaim to request a PersistentVolume storage
+apiVersion: v1
+metadata:                                     # Claim name and labels
+  name: diplom-postgres-volume-claim
+  labels:
+    app: diplom-postgres
+spec:                                         # Access mode and resource limits
+  storageClassName: manual                    # Request a certain storage class
+  accessModes:
+    - ReadWriteMany                           # ReadWriteMany means the volume can be mounted as read-write by many Nodes
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment                                # Type of the kubernetes resource
+metadata:
+  name: diplom-postgress-deployment                       # Name of the deployment
+  labels:                                        # Labels applied to this deployment
+    app: diplom-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: diplom-postgres                # This deployment applies to any Pods matching the specified label
+      tier: postgres
+  template:                                       # Template for the Pods in this deployment
+    metadata:
+      labels:                                     # Labels to be applied to the Pods in this deployment
+        app: diplom-postgres
+        tier: postgres
+    spec:                                         # The spec for the containers that will be run inside the Pods in this deployment
+      containers:
+        - image: postgres:latest                  # The container image
+          name: postgres
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 5432                   # The port that the container exposes
+              name: postgres
+          envFrom:
+            - configMapRef:
+                name: postgres-config
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-persistent-diplom-storage     # This name should match the name specified in `volumes.name`
+      volumes:                                      # A PersistentVolume is mounted as a volume to the Pod
+        - name: postgres-persistent-diplom-storage
+          persistentVolumeClaim:
+            claimName: diplom-postgres-volume-claim
+---
+apiVersion: v1                                      # API version
+kind: Service                                       # Type of kubernetes resource
+metadata:
+  name: diplom-postgres-service                          # Name of the resource
+  labels:                                           # Labels that will be applied to the resource
+    app: diplom-postgres
+spec:
+  type: NodePort
+  ports:
+    - port: 5432
+      nodePort: 30951
+  selector:                                         # Selects any Pod with labels `app=diplom-oauth,tier=postgres`
+    app: diplom-postgres
+    tier: postgres

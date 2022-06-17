@@ -24,7 +24,6 @@ func Start(cfg *models.GlobalConfig) error {
 	if err != nil {
 		return fmt.Errorf("ldap.NewClient staff: %v", err)
 	}
-
 	ldapStudClient, err := ldap.NewClient(ldap.Settings{
 		BaseDn:   cfg.LdapStudDn,
 		Host:     cfg.LdapStudHost,
@@ -49,14 +48,13 @@ func Start(cfg *models.GlobalConfig) error {
 	yandexCfg := models.NewYandexConfig(cfg.YandexClientId, cfg.YandexClientSecret)
 	googleCfg := models.NewGoogleConfig(cfg.GoogleClientId, cfg.GoogleClientSecret)
 	vkCfg := models.NewVkConfig(cfg.VkClientId, cfg.VkClientSecret)
-	bitrixCfg := models.NewBitrixConfig(cfg.BitrixClientId, cfg.BitrixClientSecret)
 	githubCfg := models.NewGithubConfig(cfg.GithubClientId, cfg.GithubClientSecret)
 	mailCfg := models.NewMailConfig(cfg.MailClientId, cfg.MailClientSecret)
 	odnklsCfg := models.NewOdnoklassnikiConfig(cfg.OdnoklassnikiClientId, cfg.OdnoklassnikiClientSecret)
 	discCfg := models.NewDiscordConfig(cfg.DiscordClientId, cfg.DiscordClientSecret)
 	fcbCfg := models.NewFacebookConfig(cfg.FacebookClientId, cfg.FacebookClientSecret)
 
-	server := NewServer(yandexCfg, googleCfg, vkCfg, bitrixCfg, githubCfg, mailCfg, odnklsCfg, discCfg, fcbCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
+	server := NewServer(yandexCfg, googleCfg, vkCfg, githubCfg, mailCfg, odnklsCfg, discCfg, fcbCfg, ldapStaffClient, ldapStudClient, storageFacade, tokenManager, cache)
 
 	fmt.Println("server is running")
 	return http.ListenAndServe(":8080", server)

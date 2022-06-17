@@ -6,6 +6,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"time"
 )
+
 type Manager struct {
 	signingKey string
 }

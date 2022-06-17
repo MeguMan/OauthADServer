@@ -9,18 +9,16 @@ const (
 	ExternalServiceTypeMail ExternalServiceType = 5
 	ExternalServiceTypeDiscord ExternalServiceType = 6
 	ExternalServiceTypeFacebook ExternalServiceType = 7
+
+	LoginStatusOk LoginStatus = "ok"
+	LoginStatusFail LoginStatus = "fail"
 )
 
 type ExternalServiceType int8
+type LoginStatus string
 
 type Link struct {
 	EmployeeId string `db:"employee_id"`
 	ExternalServiceId string `db:"external_service_id"`
 	ExternalServiceTypeId ExternalServiceType `db:"external_service_type_id"`
 }
-
-//type OauthClient struct {
-//	ClientId string `db:"client_id"`
-//	ClientSecret string `db:"client_secret"`
-//	RedirectUri string `db:"redirect_uri"`
-//}
